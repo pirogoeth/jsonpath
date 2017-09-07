@@ -3,7 +3,6 @@ package jsonpath
 import (
 	"fmt"
 	"github.com/mohae/utilitybelt/deepcopy"
-	//"golang.org/x/tools/go/types"
 	"go/token"
 	"go/types"
 	"reflect"
@@ -13,8 +12,6 @@ import (
 
 func JsonPathLookup(obj interface{}, jpath string) (interface{}, error) {
 	steps, err := tokenize(jpath)
-	fmt.Println("f: steps: ", steps, err)
-	fmt.Println(jpath, steps)
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +20,6 @@ func JsonPathLookup(obj interface{}, jpath string) (interface{}, error) {
 	}
 	steps = steps[1:]
 	xobj := deepcopy.Iface(obj)
-	fmt.Println("f: xobj", xobj)
 	for _, s := range steps {
 		op, key, args, err := parse_token(s)
 		// "key", "idx"
@@ -34,17 +30,14 @@ func JsonPathLookup(obj interface{}, jpath string) (interface{}, error) {
 				return nil, err
 			}
 		case "idx":
-			fmt.Println("idx ----------------1")
 			xobj, err = get_key(xobj, key)
 			if err != nil {
 				return nil, err
 			}
 
 			if len(args.([]int)) > 1 {
-				fmt.Println("idx ----------------2")
 				res := []interface{}{}
 				for _, x := range args.([]int) {
-					fmt.Println("idx ---- ", x)
 					tmp, err := get_idx(xobj, x)
 					if err != nil {
 						return nil, err
@@ -53,13 +46,11 @@ func JsonPathLookup(obj interface{}, jpath string) (interface{}, error) {
 				}
 				xobj = res
 			} else if len(args.([]int)) == 1 {
-				fmt.Println("idx ----------------3")
 				xobj, err = get_idx(xobj, args.([]int)[0])
 				if err != nil {
 					return nil, err
 				}
 			} else {
-				fmt.Println("idx ----------------4")
 				return nil, fmt.Errorf("cannot index on empty slice")
 			}
 		case "range":
@@ -94,10 +85,8 @@ func tokenize(query string) ([]string, error) {
 	//	token_end := false
 	token := ""
 
-	// fmt.Println("-------------------------------------------------- start")
 	for idx, x := range query {
 		token += string(x)
-		// fmt.Printf("idx: %d, x: %s, token: %s, tokens: %v\n", idx, string(x), token, tokens)
 		if idx == 0 {
 			if token == "$" || token == "@" {
 				tokens = append(tokens, token[:])
@@ -116,9 +105,7 @@ func tokenize(query string) ([]string, error) {
 			token = "."
 			continue
 		} else {
-			// fmt.Println("else: ", string(x), token)
 			if strings.Contains(token, "[") {
-				// fmt.Println(" contains [ ")
 				if x == ']' && !strings.HasSuffix(token, "\\]") {
 					if token[0] == '.' {
 						tokens = append(tokens, token[1:])
@@ -129,7 +116,6 @@ func tokenize(query string) ([]string, error) {
 					continue
 				}
 			} else {
-				// fmt.Println(" doesn't contains [ ")
 				if x == '.' {
 					if token[0] == '.' {
 						tokens = append(tokens, token[1:len(token)-1])
@@ -158,8 +144,6 @@ func tokenize(query string) ([]string, error) {
 			}
 		}
 	}
-	// fmt.Println("finished tokens: ", tokens)
-	// fmt.Println("================================================= done ")
 	return tokens, nil
 }
 
@@ -186,7 +170,6 @@ func parse_token(token string) (op string, key string, args interface{}, err err
 		}
 		tail = tail[1 : len(tail)-1]
 
-		fmt.Println(key, tail)
 		if strings.Contains(tail, "?") {
 			// filter -------------------------------------------------
 			op = "filter"
@@ -235,8 +218,6 @@ func parse_token(token string) (op string, key string, args interface{}, err err
 
 func filter_get_from_explicit_path(obj interface{}, path string) (interface{}, error) {
 	steps, err := tokenize(path)
-	fmt.Println("f: steps: ", steps, err)
-	fmt.Println(path, steps)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +226,6 @@ func filter_get_from_explicit_path(obj interface{}, path string) (interface{}, e
 	}
 	steps = steps[1:]
 	xobj := obj
-	fmt.Println("f: xobj", xobj)
 	for _, s := range steps {
 		op, key, args, err := parse_token(s)
 		// "key", "idx"
@@ -346,7 +326,6 @@ func get_range(obj, frm, to interface{}) (interface{}, error) {
 		if _to < 0 || _to > length {
 			return nil, fmt.Errorf("index [to] out of range: len: %v, to: %v", length, to)
 		}
-		fmt.Println("_frm, _to: ", _frm, _to)
 		res_v := reflect.ValueOf(obj).Slice(_frm, _to)
 		return res_v.Interface(), nil
 	default:
@@ -439,10 +418,7 @@ func parse_filter(filter string) (lp string, op string, rp string, err error) {
 
 func eval_filter(obj, root interface{}, lp, op, rp string) (res bool, err error) {
 	var lp_v interface{}
-	fmt.Println(obj, root)
-	fmt.Printf("lp: %v, op: %v, rp: %v\n", lp, op, rp)
 	if strings.HasPrefix(lp, "@.") {
-		fmt.Println("@. ----------------")
 		lp_v, err = filter_get_from_explicit_path(obj, lp)
 	} else if strings.HasPrefix(lp, "$.") {
 		lp_v, err = filter_get_from_explicit_path(root, lp)
@@ -463,7 +439,6 @@ func eval_filter(obj, root interface{}, lp, op, rp string) (res bool, err error)
 		} else {
 			rp_v = rp
 		}
-		fmt.Printf("lp_v: %v, rp_v: %v\n", lp_v, rp_v)
 		return cmp_any(lp_v, rp_v, op)
 	}
 }
@@ -474,9 +449,7 @@ func cmp_any(obj1, obj2 interface{}, op string) (bool, error) {
 	default:
 		return false, fmt.Errorf("op should only be <, <=, ==, >= and >")
 	}
-	fmt.Println("cmp_any: ", obj1, obj2)
 	exp := fmt.Sprintf("%v %s %v", obj1, op, obj2)
-	fmt.Println("exp: ", exp)
 	fset := token.NewFileSet()
 	res, err := types.Eval(fset, nil, 0, exp)
 	if err != nil {
